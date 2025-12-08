@@ -18,75 +18,94 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - name: Mark workspace as safe
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          sparse-checkout: ""
+          sparse-checkout-cone-mode: false
       - name: Get latest commit on main branch
         run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git fetch origin ${{ env.MASTER_BRANCH }} || echo "branch ${{ env.MASTER_BRANCH }} not found"
           PR_SHA=${{ github.event.pull_request.base.sha }}
           MASTER_SHA=$(git rev-parse origin/${{ env.MASTER_BRANCH }} 2>/dev/null || echo $PR_SHA)
           echo "Latest ${{ env.MASTER_BRANCH }} commit: $MASTER_SHA"
           echo "MASTER_SHA=$MASTER_SHA" >> $GITHUB_ENV
           echo "KART_DIFF_HTML_FILE=kart-diff.html" >> $GITHUB_ENV
-      - name: Log software versions
+          cd ..
+          KART_WORKSPACE=$(pwd)/kart
+          echo "KART_WORKSPACE=$KART_WORKSPACE" >> $GITHUB_ENV
+          OUTPUT_DIR=$(pwd)/files
+          echo "OUTPUT_DIR=$OUTPUT_DIR" >> $GITHUB_ENV
+          mkdir -p $OUTPUT_DIR
+          cd $GITHUB_WORKSPACE
+      - name: SW Versions
         run: |
           echo "kart version:"
           kart --version
           echo "gdal version:"
           gdal --version
-      - name: Run kart clone
+          echo "git version:"
+          git --version
+      - name: Kart - Clone
         run: |
-          kart clone .git kart 2>clone-stderr.txt || cat clone-stderr.txt
-      - name: Quality check current working copy (gpgk file) (placeholder)
+          # Move .git to .kart to convert the repo in-place without re-cloning.
+          mv .git .kart
+          echo 'gitdir: .kart' >> .git
+          git config -f .kart/config kart.repostructure.version 3
+          git config -f .kart/config kart.workingcopy.location data.gpkg
+          git config -f .kart/config core.repositoryformatversion 0
+          kart create-workingcopy data.gpkg 2>${{ env.OUTPUT_DIR }}/wcopy-stderr.txt || cat ${{ env.OUTPUT_DIR }}/wcopy-stderr.txt
+          for layer in $(kart data ls); do
+            git config -f .kart/config core.repositoryformatversion 1
+            git sparse-checkout set "$layer"
+            git checkout HEAD
+            git config -f .kart/config core.repositoryformatversion 0
+            kart export "${layer}" "${{ env.OUTPUT_DIR }}/${layer}.gpkg"
+          done
+      - name: QC gpgk file (placeholder)
         run: |
           echo "Checking *.gpkg files"
           find . -name "*.gpkg" -exec ogrinfo {} \;
           echo "Add validation steps here"
-      - name: Run kart diff and git diff
+      - name: Kart - Diff
         run: |
           echo "Diffing current branch ${{ github.ref_name }} against origin/${{ env.MASTER_BRANCH }}."
           echo "Master commit: ${{ env.MASTER_SHA }}"
           echo "Current commit: ${{ github.sha }}"
-          echo "Diff output file: ${{ env.KART_DIFF_HTML_FILE }}"
           echo "git diff"
-          git diff origin/${{ env.MASTER_BRANCH }} HEAD -p > git-diff.txt || echo "git diff failed"
-          echo "GIT_DIFF_LINES=$(wc -l < git-diff.txt)" >> $GITHUB_ENV
-          GIT_DIFF_TEXT="$(cat git-diff.txt)"
+          git diff origin/${{ env.MASTER_BRANCH }} HEAD -p > ${{ env.OUTPUT_DIR }}/git-diff.txt || echo "git diff failed"
+          echo "GIT_DIFF_LINES=$(wc -l < ${{ env.OUTPUT_DIR }}/git-diff.txt)" >> $GITHUB_ENV
+          GIT_DIFF_TEXT="$(cat ${{ env.OUTPUT_DIR }}/git-diff.txt)"
           echo "GIT_DIFF_TEXT<<EOF" >> $GITHUB_ENV
           echo "$GIT_DIFF_TEXT" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
-          cd kart
           echo "kart diff geojson"
-          kart diff ${{ env.MASTER_SHA }} ${{ github.sha }} -o geojson > ../kart-diff.geojson || echo "kart diff failed using ${{ github.sha }}"
-          KART_DIFF_GEOJSON="$(cat ../kart-diff.geojson)"
+          kart diff ${{ env.MASTER_SHA }} ${{ github.sha }} -o geojson > ${{ env.OUTPUT_DIR }}/kart-diff.geojson || echo "kart diff failed using ${{ github.sha }}"
+          KART_DIFF_GEOJSON="$(cat ${{ env.OUTPUT_DIR }}/kart-diff.geojson)"
           echo "KART_DIFF_GEOJSON<<EOF" >> $GITHUB_ENV
           echo "$KART_DIFF_GEOJSON" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV          
           echo "kart diff text"
-          kart diff ${{ env.MASTER_SHA }} ${{ github.sha }} > ../kart-diff.txt || echo "kart diff failed using ${{ github.sha }}"
-          echo "KART_DIFF_LINES=$(wc -l < ../kart-diff.txt)" >> $GITHUB_ENV
-          KART_DIFF_TEXT="$(cat ../kart-diff.txt)"
+          kart diff ${{ env.MASTER_SHA }} ${{ github.sha }} > ${{ env.OUTPUT_DIR }}/kart-diff.txt || echo "kart diff failed using ${{ github.sha }}"
+          echo "KART_DIFF_LINES=$(wc -l < ${{ env.OUTPUT_DIR }}/kart-diff.txt)" >> $GITHUB_ENV
+          KART_DIFF_TEXT="$(cat ${{ env.OUTPUT_DIR }}/kart-diff.txt)"
           echo "KART_DIFF_TEXT<<EOF" >> $GITHUB_ENV
           echo "$KART_DIFF_TEXT" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
           echo "kart diff html"
-          kart diff ${{ env.MASTER_SHA }} ${{ github.sha }} --output-format html --output ../${{ env.KART_DIFF_HTML_FILE }} 2>diff-stderr.txt || cat diff-stderr.txt
-          grep -q 'x3cfiles' ../${{ env.KART_DIFF_HTML_FILE }} && echo "Fixing bad json encoding in kart html output." && sed -i 's/\\x3cfiles\\x3e/<files>/g' ../${{ env.KART_DIFF_HTML_FILE }}
+          kart diff ${{ env.MASTER_SHA }} ${{ github.sha }} --output-format html --output ${{ env.OUTPUT_DIR }}/${{ env.KART_DIFF_HTML_FILE }} 2>${{ env.OUTPUT_DIR }}/diff-stderr.txt || cat ${{ env.OUTPUT_DIR }}/diff-stderr.txt
+          grep -q 'x3cfiles' ${{ env.OUTPUT_DIR }}/${{ env.KART_DIFF_HTML_FILE }} && echo "Fixing bad json encoding in kart html output." && sed -i 's/\\x2f/\//g; s/\\x3c/</g; s/\\x3e/>/g' ${{ env.OUTPUT_DIR }}/${{ env.KART_DIFF_HTML_FILE }}
           echo "Diff complete."
+      - name: dev - include working copy in artifact
+        run: |
+          cp -v data.gpkg ${{ env.OUTPUT_DIR }}/ || echo "copy failed"
       - name: Upload diff results artifact
         id: artifact-upload
         uses: actions/upload-artifact@v5
         with:
           name: diff-outputs
-          path: |
-            ${{ env.KART_DIFF_HTML_FILE }}
-            kart-diff.geojson
-            kart-diff.txt
-            git-diff.txt
-            diff-stderr.txt
-            clone-stderr.txt
+          path: ${{ env.OUTPUT_DIR }}
           retention-days: ${{ env.RETENTION_DAYS }}
       - name: Add or update PR comment with diffs
+        if: github.event_name == 'pull_request'
         uses: linz/action-pr-comment@master
         with:
           mode: upsert
@@ -120,13 +139,19 @@ jobs:
             ${{ env.GIT_DIFF_TEXT }}
             ```
             </details>
-      - name: Convert layers to parquet (placeholder)
+      - name: Convert to parquet (placeholder)
         run: |
           echo "Converting to parquet"
-          find . -name "*.gpkg" -exec bash -c 'echo "Converting File: $0"; for layer in $(ogrinfo -q $0 | cut -d: -f2-); do gdal vector convert -l $layer "$0" "${0%.gpkg}.${layer}.parquet" --lco ROW_GROUP_SIZE=4096 --lco GEOMETRY_ENCODING=GEOARROW --lco USE_PARQUET_GEO_TYPES=YES --lco compression=zstd --lco compression_level=15 ; done' {} \;
-          echo "Sample parquet files created - needs updating with suitable geoparquet settings - row group, column chunk, sorting, etc"
+          gdal --version
+          echo "disk usage before parquet conversion:"
+          df -h
+          find . -name "*.gpkg" -exec bash -c 'echo "Converting File: $0"; for layer in $(ogrinfo -q $0 | cut -d: -f2-); do gdal vector convert -l "$layer" "$0" "${0%.gpkg}.${layer}.parquet" --lco ROW_GROUP_SIZE=4096 --lco SORT_BY_BBOX=YES --lco compression=zstd --lco compression_level=15 ; done' {} \;
+          echo "needs updating with suitable geoparquet settings - row group, column chunk, sorting, etc"
+          echo "disk usage after parquet conversion:"
+          df -h
       - name: Transfer parquet files to S3 (placeholder)
         run: |
           echo "Listing parquet files"
           find . -name "*.parquet" -exec ls -lh {} \;
           echo "Add transfer steps here - target key based on type of push (tag/release/main/branch/PR)"
+          
