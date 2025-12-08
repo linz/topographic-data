@@ -53,7 +53,6 @@ jobs:
           git config -f .kart/config core.repositoryformatversion 0
       - name: Kart - Clone
         run: |
-          kart create-workingcopy data.gpkg 2>${{ env.OUTPUT_DIR }}/wcopy-stderr.txt || cat ${{ env.OUTPUT_DIR }}/wcopy-stderr.txt
           for layer in $(kart data ls); do
             git sparse-checkout set "$layer"
             git checkout HEAD
@@ -62,7 +61,7 @@ jobs:
       - name: QC gpgk file (placeholder)
         run: |
           echo "Checking *.gpkg files"
-          find . -name "*.gpkg" -exec ogrinfo {} \;
+          find "${{ env.OUTPUT_DIR }}" -name "*.gpkg" -print -exec ogrinfo {} \;
           echo "Add validation steps here"
       - name: Kart - Diff
         run: |
@@ -93,9 +92,6 @@ jobs:
           kart diff ${{ env.MASTER_SHA }} ${{ github.sha }} --output-format html --output ${{ env.OUTPUT_DIR }}/${{ env.KART_DIFF_HTML_FILE }} 2>${{ env.OUTPUT_DIR }}/diff-stderr.txt || cat ${{ env.OUTPUT_DIR }}/diff-stderr.txt
           grep -q 'x3cfiles' ${{ env.OUTPUT_DIR }}/${{ env.KART_DIFF_HTML_FILE }} && echo "Fixing bad json encoding in kart html output." && sed -i 's/\\x2f/\//g; s/\\x3c/</g; s/\\x3e/>/g' ${{ env.OUTPUT_DIR }}/${{ env.KART_DIFF_HTML_FILE }}
           echo "Diff complete."
-      - name: dev - include working copy in artifact
-        run: |
-          cp -v data.gpkg ${{ env.OUTPUT_DIR }}/ || echo "copy failed"
       - name: Upload diff results artifact
         id: artifact-upload
         uses: actions/upload-artifact@v5
