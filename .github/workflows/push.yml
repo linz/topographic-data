@@ -17,9 +17,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          fetch-depth: 0
-          sparse-checkout: ""
-          sparse-checkout-cone-mode: false
+          sparse-checkout: ".github"
+          sparse-checkout-cone-mode: true
       - name: Get latest commit on main branch
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -44,7 +43,7 @@ jobs:
           gdal --version
           echo "git version:"
           git --version
-      - name: Kart - Clone
+      - name: Prepare repo for kart clone
         run: |
           # Move .git to .kart to convert the repo in-place without re-cloning.
           mv .git .kart
@@ -52,12 +51,12 @@ jobs:
           git config -f .kart/config kart.repostructure.version 3
           git config -f .kart/config kart.workingcopy.location data.gpkg
           git config -f .kart/config core.repositoryformatversion 0
+      - name: Kart - Clone
+        run: |
           kart create-workingcopy data.gpkg 2>${{ env.OUTPUT_DIR }}/wcopy-stderr.txt || cat ${{ env.OUTPUT_DIR }}/wcopy-stderr.txt
           for layer in $(kart data ls); do
-            git config -f .kart/config core.repositoryformatversion 1
             git sparse-checkout set "$layer"
             git checkout HEAD
-            git config -f .kart/config core.repositoryformatversion 0
             kart export "${layer}" "${{ env.OUTPUT_DIR }}/${layer}.gpkg"
           done
       - name: QC gpgk file (placeholder)
@@ -104,7 +103,7 @@ jobs:
           name: diff-outputs
           path: ${{ env.OUTPUT_DIR }}
           retention-days: ${{ env.RETENTION_DAYS }}
-      - name: Add or update PR comment with diffs
+      - name: PR comment with Text diff
         if: github.event_name == 'pull_request'
         uses: linz/action-pr-comment@master
         with:
@@ -142,9 +141,6 @@ jobs:
       - name: Convert to parquet (placeholder)
         run: |
           echo "Converting to parquet"
-          gdal --version
-          echo "disk usage before parquet conversion:"
-          df -h
           find . -name "*.gpkg" -exec bash -c 'echo "Converting File: $0"; for layer in $(ogrinfo -q $0 | cut -d: -f2-); do gdal vector convert -l "$layer" "$0" "${0%.gpkg}.${layer}.parquet" --lco ROW_GROUP_SIZE=4096 --lco SORT_BY_BBOX=YES --lco compression=zstd --lco compression_level=15 ; done' {} \;
           echo "needs updating with suitable geoparquet settings - row group, column chunk, sorting, etc"
           echo "disk usage after parquet conversion:"
@@ -154,4 +150,8 @@ jobs:
           echo "Listing parquet files"
           find . -name "*.parquet" -exec ls -lh {} \;
           echo "Add transfer steps here - target key based on type of push (tag/release/main/branch/PR)"
+      - name: Cleanup repo from kart clone
+        run: |
+          test -f .git && rm -fv .git 
+          mv -v .kart .git
           
