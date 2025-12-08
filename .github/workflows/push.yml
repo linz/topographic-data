@@ -10,6 +10,17 @@ jobs:
   clone-diff-qc-export:
     runs-on: ubuntu-latest
 
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+
+    env:
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+
+    environment:
+      name: prod
+
     container:
       image: ghcr.io/linz/action-kart:v0.1.2
 
@@ -52,7 +63,11 @@ jobs:
           git config -f .kart/config kart.workingcopy.location data.gpkg
           git config -f .kart/config core.repositoryformatversion 0
       - name: Kart - Clone
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+          echo "Exporting layers to geopackage files"
           for layer in $(kart data ls); do
             git sparse-checkout set "$layer"
             git checkout HEAD
@@ -134,6 +149,12 @@ jobs:
             ${{ env.GIT_DIFF_TEXT }}
             ```
             </details>
+
+      - name: Cleanup repo from kart clone
+        run: |
+          test -f .git && rm -fv .git 
+          mv -v .kart .git
+
       - name: Convert to parquet (placeholder)
         run: |
           echo "Converting to parquet"
@@ -144,10 +165,5 @@ jobs:
       - name: Transfer parquet files to S3 (placeholder)
         run: |
           echo "Listing parquet files"
-          find . -name "*.parquet" -exec ls -lh {} \;
+          find "${{ env.OUTPUT_DIR }}" -name "*.parquet" -exec ls -lh {} \;
           echo "Add transfer steps here - target key based on type of push (tag/release/main/branch/PR)"
-      - name: Cleanup repo from kart clone
-        run: |
-          test -f .git && rm -fv .git 
-          mv -v .kart .git
-          
