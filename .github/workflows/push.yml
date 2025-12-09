@@ -8,25 +8,11 @@ jobs:
         image: ghcr.io/linz/action-kart:v0.1.2
 
     steps:
-        - name: Checkout repository
-          uses: actions/checkout@v6
-          with:
-            sparse-checkout: ".github"
-            sparse-checkout-cone-mode: true
 
-        - name: Fetch Data
+        - name: Kart clone
           run: |
-            git config --global --add safe.directory "$GITHUB_WORKSPACE"
-            git fetch origin ${{ github.sha }}
-
-        - name: Prepare repo for kart clone
-          run: |
-            # Move .git to .kart to convert the repo in-place without re-cloning.
-            mv .git .kart
-            echo 'gitdir: .kart' >> .git
-            git config -f .kart/config kart.repostructure.version 3
-            git config -f .kart/config kart.workingcopy.location data.gpkg
-            git config -f .kart/config core.repositoryformatversion 0
+            kart clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/linz/topographic-data.git . --no-checkout
+            kart switch ${{ github.sha }}
 
         - name: Export
           run: |
