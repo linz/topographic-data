@@ -16,6 +16,7 @@ jobs:
 
         - name: Fetch Data
           run: |
+            git config --global --add safe.directory "$GITHUB_WORKSPACE"
             git fetch origin ${{ github.sha }}
 
         - name: Prepare repo for kart clone
