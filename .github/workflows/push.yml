@@ -2,7 +2,7 @@ on: push
 
 jobs:
   build:
-    runs-on: ubuntu-latest-8-cores
+    runs-on: ubuntu-latest-large
 
     container:
         image: ghcr.io/linz/action-kart:v0.1.2
