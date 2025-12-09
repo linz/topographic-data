@@ -12,7 +12,9 @@ jobs:
         - name: Kart clone
           run: |
             kart clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/linz/topographic-data.git . --no-checkout
-            kart switch ${{ github.sha }}
+
+            cd topographic-data/
+            kart -C switch ${{ github.sha }}
 
         - name: Export
           run: |
