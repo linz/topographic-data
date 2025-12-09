@@ -15,10 +15,14 @@ jobs:
 
             ls -alh
             cd topographic-data/
-            kart switch ${{ github.sha }}
+            kart fetch origin ${{ github.sha }}
+
+        - name: Diff
+          run: |
+            kart diff ${{ github.sha }}..master
 
         - name: Export
           run: |
             for layer in $(kart data ls); do
-              kart export "${layer}" "${layer}.gpkg"
+              kart export --ref ${{ github.sha }} "${layer}" "${layer}.gpkg"
             done
