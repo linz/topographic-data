@@ -11,7 +11,7 @@ jobs:
 
         - name: Kart clone
           run: |
-            kart clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/linz/topographic-data.git . --no-checkout
+            kart clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/linz/topographic-data.git  --no-checkout
 
             ls -alh
             cd topographic-data/
