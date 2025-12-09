@@ -23,6 +23,6 @@ jobs:
 
         - name: Export
           run: |
-            for layer in $(kart data ls); do
+            for layer in $(kart -C topographic-data data ls); do
               kart -C topographic-data export --ref ${{ github.sha }} "${layer}" "${layer}.gpkg"
             done
