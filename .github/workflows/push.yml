@@ -19,10 +19,10 @@ jobs:
 
         - name: Diff
           run: |
-            kart diff -C topographic-data ${{ github.sha }}..master
+            kart -C topographic-data diff ${{ github.sha }}..master
 
         - name: Export
           run: |
             for layer in $(kart data ls); do
-              kart export -C topographic-data --ref ${{ github.sha }} "${layer}" "${layer}.gpkg"
+              kart -C topographic-data export --ref ${{ github.sha }} "${layer}" "${layer}.gpkg"
             done
