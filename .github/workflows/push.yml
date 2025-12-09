@@ -2,7 +2,7 @@ on: push
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-large
 
     container:
         image: ghcr.io/linz/action-kart:v0.1.2
@@ -23,6 +23,5 @@ jobs:
 
         - name: Export
           run: |
-            for layer in $(kart -C topographic-data data ls); do
-              kart -C topographic-data export --ref ${{ github.sha }} "${layer}" "${layer}.gpkg"
-            done
+            kart -C topographic-data data ls | \
+              xargs -P 4 -I {} kart -C topographic-data export --ref ${{ github.sha }} "{}" "{}.gpkg"
