@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   diff-qc-export:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest_8core
     container:
       image: ghcr.io/linz/action-kart:v0.1.2
     steps:
