@@ -1,36 +1,136 @@
-on: push
+name: pr-diff-qc-export
+
+env:
+  MASTER_BRANCH: master
+  RETENTION_DAYS: 5
+
+on: pull_request
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
 
 jobs:
-  build:
-    runs-on: ubuntu-latest_8core
-
+  diff-qc-export:
+    runs-on: ubuntu-latest
     container:
-        image: ghcr.io/linz/action-kart:v0.1.2
-
+      image: ghcr.io/linz/action-kart:v0.1.2
     steps:
-        - name: Inspect
-          run: |
-            lscpu
-            df -h .
+      - name: Kart - Clone
+        run: |
+          kart clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/linz/${{ github.event.repository.name }}.git  --no-checkout
+          cd ${{ github.event.repository.name }}/
+          kart fetch origin ${{ github.sha }}
+      - name: Kart - Diff
+        run: |
+          for type in html text geojson; do
+            echo "kart diff $type"
+            kart -C ${{ github.event.repository.name }} diff ${{ github.sha }}..master -o $type --output kart_diff.$type
+            sed -i 's/\\x2f/\//g; s/\\x3c/</g; s/\\x3e/>/g' kart_diff.html
+            test -f kart_diff.$type && KART_DIFF_CONTENT="$(cat kart_diff.$type)"
+            test -d kart_diff.$type && KART_DIFF_CONTENT="$(cat kart_diff.$type/* || echo '')"
+            echo "KART_DIFF_$type<<EOF" >> $GITHUB_ENV
+            echo "$KART_DIFF_CONTENT" >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
+          done
+          mv -v kart_diff.text kart_diff.txt
+          
+          KART_DIFF_SUMMARY="$(kart -C ${{ github.event.repository.name }} diff ${{ github.sha }}..master --only-feature-count exact)"
+          echo "KART_DIFF_SUMMARY<<EOF" >> $GITHUB_ENV
+          echo "$KART_DIFF_SUMMARY" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+          
+          # Git Diff
+          mv -v ./${{ github.event.repository.name }}/.kart/index  ./${{ github.event.repository.name }}/.kart/no-index
+          echo "git diff"
+          git -C ${{ github.event.repository.name }} diff ${{ github.sha }}..master -p > git_diff.txt
+          echo "GIT_DIFF_LINES=$(wc -l < git_diff.txt)" >> $GITHUB_ENV
 
-        - name: Kart clone
-          run: |
-            kart clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/linz/topographic-data.git  --no-checkout
+          GIT_DIFF_TEXT="$(cat git_diff.txt)"
+          echo "GIT_DIFF_TEXT<<EOF" >> $GITHUB_ENV
+          echo "$GIT_DIFF_TEXT" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
-            ls -alh
-            cd topographic-data/
-            kart fetch origin ${{ github.sha }}
+          echo "Diff complete."
 
-        - name: Diff
-          run: |
-            kart -C topographic-data diff ${{ github.sha }}..master
+      - name: Upload diff results artifact
+        id: artifact-upload
+        uses: actions/upload-artifact@v5
+        with:
+          name: diff-outputs
+          path: |
+            kart_diff.geojson/*
+            kart_diff.html
+            kart_diff.txt
+            git_diff.txt
+          retention-days: ${{ env.RETENTION_DAYS }}
 
-        - name: Inspect
-          run: |
-            lscpu
-            df -h .
+      - name: PR comment with Text diff
+        if: github.event_name == 'pull_request'
+        uses: linz/action-pr-comment@master
+        with:
+          mode: upsert
+          comment-tag: diff-results
+          create-if-not-exists: 'true'
+          message: |
+            # Changes
+            To view a map and table with all changes, see the HTML file in the [attached artifacts](${{ steps.artifact-upload.outputs.artifact-url }}) zip archive (available for ${{ env.RETENTION_DAYS }} days).
 
-        - name: Export
-          run: |
-            kart -C topographic-data data ls | \
-              xargs -P 4 -I {} kart -C topographic-data export --ref ${{ github.sha }} "{}" "{}.gpkg"
+            ```geojson
+            ${{ env.KART_DIFF_geojson }}
+            ```
+
+            ## Kart Diff Results
+            ${{ env.KART_DIFF_SUMMARY }}
+
+            <details>
+            <summary>kart diff - click to expand</summary>
+
+            ```diff
+            ${{ env.KART_DIFF_text }}
+            ```
+            </details>
+
+            ## Git Diff Results
+            
+            <details>
+            <summary>git diff - click to expand (${{ env.GIT_DIFF_LINES }} lines)</summary>
+
+            ```diff
+            ${{ env.GIT_DIFF_TEXT }}
+            ```
+            </details>
+
+
+      - name: Export kart to gpkg
+        run: |
+          kart -C ${{ github.event.repository.name }} data ls | \
+            xargs -P 4 -I {} kart -C ${{ github.event.repository.name }} export --ref ${{ github.sha }} "{}" "{}.gpkg"
+
+      - name: Convert gpkg to parquet (placeholder)
+        run: |
+          echo "Converting to parquet"
+          find . -name "*.gpkg" -exec bash -c 'echo "Converting File: $0"; for layer in $(ogrinfo -q $0 | cut -d: -f2-); do gdal vector convert -l "$layer" "$0" "${0%.gpkg}.${layer}.parquet" --lco ROW_GROUP_SIZE=4096 --lco SORT_BY_BBOX=YES --lco compression=zstd --lco compression_level=15 ; done' {} \;
+          echo "needs updating with suitable geoparquet settings - row group, column chunk, sorting, etc"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: layers
+          path: |
+            *.gpkg
+            *.parquet
+          retention-days: ${{ env.RETENTION_DAYS }}
+
+      - name: QC gpgk file
+        run: |
+          echo "Checking *.gpkg files"
+          find . -name "*.gpkg" -print -exec ogrinfo {} \;
+          echo "needs proper QC"
+
+      - name: Transfer parquet files to S3 (placeholder)
+        run: |
+          echo "Listing parquet files"
+          find . -name "*.parquet" -exec ls -lh {} \;
+          echo "Add transfer steps here - target key based on type of push (tag/release/main/branch/PR)"
