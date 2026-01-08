@@ -1,0 +1,21 @@
+name: pr-checks
+
+on: pull_request
+
+jobs:
+  diff-qc-export:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/linz/topographic-system/kart:pr-21
+
+    steps:
+      - run: node /scripts/index.js version
+      - run: node /scripts/index.js clone ${{ github.event.repository.clone_url }} --ref ${{ github.head_ref }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: node /scripts/index.js diff
+      - run: node /scripts/index.js pr-comment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: node /scripts/index.js export
+
