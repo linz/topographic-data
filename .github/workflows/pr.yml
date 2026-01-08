@@ -17,5 +17,5 @@ jobs:
       - run: node /scripts/index.js pr-comment
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: node /scripts/index.js export
+#      - run: node /scripts/index.js export
 
