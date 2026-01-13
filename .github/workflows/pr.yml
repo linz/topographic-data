@@ -3,7 +3,7 @@ name: pr-checks
 on: pull_request
 
 jobs:
-  diff-qc-export:
+  kart:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/linz/topographic-system/kart:pr-23
@@ -11,7 +11,9 @@ jobs:
     permissions:
       id-token: write
       contents: read
-
+      issues: write
+      pull-requests: write
+  
     env:
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
 
@@ -43,8 +45,8 @@ jobs:
             pr_summary.md
             diff/
 
-      - name: Export datasets
-        run: node /scripts/index.js export
+      - name: Export changed datasets
+        run: node /scripts/index.js export --changed-datasets-only
 
       - name: Upload gpkg artifacts
         uses: actions/upload-artifact@v5
