@@ -45,15 +45,8 @@ jobs:
             pr_summary.md
             diff/
 
-      - name: Export datasets
-        run: node /scripts/index.js export
-
-      - name: Upload gpkg artifacts
-        uses: actions/upload-artifact@v5
-        with:
-          name: gpkg
-          path: |
-            export/
+      - name: Export changed datasets
+        run: node /scripts/index.js export --changed-datasets-only
 
       - name: Configuqre AWS Credentials
         if: ${{env.AWS_ROLE_ARN != ''}}
@@ -65,10 +58,3 @@ jobs:
 
       - name: Convert to parquet
         run: node /scripts/index.js to-parquet
-
-      - name: Upload parquet artifacts
-        uses: actions/upload-artifact@v5
-        with:
-          name: parquet
-          path: |
-            parquet/
