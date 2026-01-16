@@ -47,7 +47,7 @@ jobs:
             diff/
 
       - name: Export changed datasets
-        run: node /scripts/index.js export --changed-datasets-only
+        run: node /scripts/index.js export
 
       - name: Upload gpkg artifacts
         uses: actions/upload-artifact@v5
