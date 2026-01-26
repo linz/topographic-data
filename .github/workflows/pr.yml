@@ -1,12 +1,10 @@
-name: pr-checks
-
-on: pull_request
-
+name: kart
+on: [push, pull_request]
 jobs:
   kart:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/linz/topographic-system/kart:pr-23
+      image: ghcr.io/linz/topographic-system/kart:v0.5.0
 
     permissions:
       id-token: write
@@ -16,7 +14,6 @@ jobs:
   
     env:
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
-      ENVIRONMENT: nonprod
 
     environment:
       name: nonprod
@@ -26,7 +23,7 @@ jobs:
         run: node /scripts/index.js version
 
       - name: Clone repository
-        run: node /scripts/index.js clone ${{ github.event.repository.clone_url }} --ref ${{ github.head_ref }}
+        run: node /scripts/index.js clone ${{ github.event.repository.clone_url }} --ref ${{ github.head_ref || github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -34,6 +31,7 @@ jobs:
         run: node /scripts/index.js diff
 
       - name: Comment on PR
+        if: github.event_name == 'pull_request'
         run: node /scripts/index.js pr-comment
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
