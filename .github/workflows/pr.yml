@@ -31,16 +31,7 @@ jobs:
       - name: Generate diff
         run: node /scripts/index.js diff
 
-      - name: Find associated PR
-        id: find-pr
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          PR_NUMBER=$(gh pr list --repo ${{ github.repository }} --head ${{ github.ref_name }} --state open --json number --jq '.[0].number // empty')
-          echo "pr=$PR_NUMBER" >> $GITHUB_OUTPUT
-
       - name: Comment on PR
-        if: steps.find-pr.outputs.pr
         run: node /scripts/index.js pr-comment
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
