@@ -1,5 +1,5 @@
 name: kart
-on: [push, pull_request]
+on: push
 jobs:
   kart:
     runs-on: ubuntu-latest
@@ -24,15 +24,23 @@ jobs:
         run: node /scripts/index.js version
 
       - name: Clone repository
-        run: node /scripts/index.js clone ${{ github.event.repository.clone_url }} --ref ${{ github.head_ref || github.ref_name }}
+        run: node /scripts/index.js clone ${{ github.event.repository.clone_url }} --ref ${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate diff
         run: node /scripts/index.js diff
 
+      - name: Find associated PR
+        id: find-pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER=$(gh pr list --repo ${{ github.repository }} --head ${{ github.ref_name }} --state open --json number --jq '.[0].number // empty')
+          echo "pr=$PR_NUMBER" >> $GITHUB_OUTPUT
+
       - name: Comment on PR
-        if: github.event_name == 'pull_request'
+        if: steps.find-pr.outputs.pr
         run: node /scripts/index.js pr-comment
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
