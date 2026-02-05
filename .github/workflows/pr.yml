@@ -4,7 +4,7 @@ jobs:
   kart:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/linz/topographic-system/kart:pr-36
+      image: ghcr.io/linz/topographic-system/kart:pr-40
 
     permissions:
       id-token: write
