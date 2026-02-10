@@ -1,6 +1,6 @@
-name: pullrequest
+name: push
 
-on: pull_request
+on: push
 
 jobs:
   kart:
@@ -20,7 +20,7 @@ jobs:
       
     environment:
       name: nonprod
-      
+
     steps:
       - name: Check kart version
         run: node /scripts/index.js version
