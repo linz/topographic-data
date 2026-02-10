@@ -16,9 +16,7 @@ jobs:
   
     env:
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
-
-    environment:
-      name: nonprod
+      ENVIRONMENT: nonprod
 
     steps:
       - name: Check kart version
