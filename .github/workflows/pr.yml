@@ -6,7 +6,7 @@ jobs:
   kart:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/linz/topographic-system/kart:pr-23
+      image: ghcr.io/linz/topographic-system/kart:pr-40
 
     permissions:
       id-token: write
@@ -58,3 +58,4 @@ jobs:
 
       - name: Convert to parquet
         run: node /scripts/index.js to-parquet
+
