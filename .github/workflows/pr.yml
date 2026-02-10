@@ -1,6 +1,6 @@
-name: push
+name: kart
 
-on: push
+on: pull_request
 
 jobs:
   kart:
@@ -13,7 +13,7 @@ jobs:
       contents: read
       issues: write
       pull-requests: write
-    
+  
     env:
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
       ENVIRONMENT: nonprod
