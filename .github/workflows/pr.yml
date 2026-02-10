@@ -1,4 +1,4 @@
-name: pullrequest
+name: kart
 
 on: pull_request
 
@@ -13,9 +13,10 @@ jobs:
       contents: read
       issues: write
       pull-requests: write
-  
+
     env:
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+      ENVIRONMENT: nonprod
 
     environment:
       name: nonprod
