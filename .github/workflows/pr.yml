@@ -17,7 +17,10 @@ jobs:
     env:
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
       ENVIRONMENT: nonprod
-
+      
+    environment:
+      name: nonprod
+      
     steps:
       - name: Check kart version
         run: node /scripts/index.js version
