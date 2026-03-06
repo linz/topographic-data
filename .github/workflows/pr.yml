@@ -23,18 +23,18 @@ jobs:
 
     steps:
       - name: Check kart version
-        run: node /scripts/index.js version
+        run: node /scripts/index.cjs
 
       - name: Clone repository
-        run: node /scripts/index.js clone ${{ github.event.repository.clone_url }} --ref ${{ github.head_ref }}
+        run: node /scripts/index.cjs clone ${{ github.event.repository.clone_url }} --ref ${{ github.head_ref }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate diff
-        run: node /scripts/index.js diff
+        run: node /scripts/index.cjs diff
 
       - name: Comment on PR
-        run: node /scripts/index.js pr-comment
+        run: node /scripts/index.cjs pr-comment
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -47,7 +47,7 @@ jobs:
             diff/
 
       - name: Export changed datasets
-        run: node /scripts/index.js export --changed-datasets-only
+        run: node /scripts/index.cjs export --changed-datasets-only
 
       - name: Configuqre AWS Credentials
         if: ${{env.AWS_ROLE_ARN != ''}}
@@ -58,4 +58,4 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
 
       - name: Convert to parquet
-        run: node /scripts/index.js to-parquet
+        run: node /scripts/index.cjs to-parquet
